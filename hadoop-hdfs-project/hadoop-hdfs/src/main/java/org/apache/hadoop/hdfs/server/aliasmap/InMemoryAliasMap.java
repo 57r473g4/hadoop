@@ -93,11 +93,12 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
     } else {
       levelDBpath = new File(directory);
     }
-    if (!levelDBpath.exists()) {
-      String error = createPathErrorMessage(directory);
-      throw new IOException(error);
+    final DB levelDb;
+    try {
+      levelDb = JniDBFactory.factory.open(levelDBpath, options);
+    } catch (IOException e) {
+      throw new IOException(createPathErrorMessage(levelDBpath.getParent()));
     }
-    DB levelDb = JniDBFactory.factory.open(levelDBpath, options);
     InMemoryAliasMap aliasMap = new InMemoryAliasMap(levelDb, blockPoolID);
     aliasMap.setConf(conf);
     return aliasMap;
@@ -163,6 +164,11 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
     levelDb.put(extendedBlockDbFormat, providedStorageLocationDbFormat);
   }
 
+  public void remove(@Nonnull Block block) throws IOException {
+    byte[] extendedBlockDbFormat = toProtoBufBytes(block);
+    levelDb.delete(extendedBlockDbFormat);
+  }
+
   @Override
   public String getBlockPoolId() {
     return blockPoolID;
@@ -201,8 +207,7 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
 
   public static byte[] toProtoBufBytes(@Nonnull Block block)
       throws IOException {
-    BlockProto blockProto =
-        PBHelperClient.convert(block);
+    BlockProto blockProto = PBHelperClient.convert(block);
     ByteArrayOutputStream blockOutputStream = new ByteArrayOutputStream();
     blockProto.writeTo(blockOutputStream);
     return blockOutputStream.toByteArray();
